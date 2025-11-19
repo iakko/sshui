@@ -1,0 +1,28 @@
+[project]
+name = "ixlab-sshui"
+version = "1.0.0"
+description = "PyQt6 UI for browsing and tagging SSH configs via sshcore."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Iacopo Palazzi", email = "iacopo.palazzi@gmail.com" },
+]
+license = { text = "MIT" }
+keywords = ["ssh", "ui", "pyqt", "config"]
+dependencies = [
+  "ixlab-sshcore>=1.0.0",
+  "PyQt6>=6.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/iakko/sshui"
+
+[project.scripts]
+sshui = "sshui:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sshui*"]

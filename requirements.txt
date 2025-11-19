@@ -1,0 +1,2 @@
+ixlab-sshcore>=1.0.0
+PyQt6>=6.5

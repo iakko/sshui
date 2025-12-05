@@ -35,11 +35,12 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
 )
 
-from sshcore import config as config_module, settings as settings_module
+from sshcore import config as config_module, settings as settings_module, keys as keys_module
 from sshcore.models import HostBlock
 from .option_dialog import OptionDialog
 from .text_prompt_dialog import TextPromptDialog
 from .tag_dialog import TagDialog
+from .key_dialog import KeyDialog
 from .about_dialog import AboutDialog
 
 
@@ -60,24 +61,187 @@ class MainWindow(QMainWindow):
         self._current_list_item_index: int = -1
         self._current_tree_item: QTreeWidgetItem | None = None
         self._global_tag_definitions: dict[str, str] = {}
+        self._keys_list: QListWidget
+        self._key_details_table: QTableWidget
 
         self._setup_menus()
         self._setup_ui()
         self.load_hosts()
+        self.load_keys()
 
     def _setup_ui(self) -> None:
         central = QWidget(self)
         layout = QVBoxLayout(central)
 
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_hosts_panel(), "Hosts")
+        self._tabs.addTab(self._build_keys_panel(), "Keys")
+
+        layout.addWidget(self._tabs)
+        self.setCentralWidget(central)
+
+    def _build_hosts_panel(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+
         layout.addWidget(self._build_button_panel(), alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self._build_splitter())
         layout.addWidget(self._build_details_panel())
 
-        layout.setStretch(0, 0)  # button panel
-        layout.setStretch(1, 1)  # splitter takes most height
-        layout.setStretch(2, 0)  # SSH command panel
+        layout.setStretch(0, 0)
+        layout.setStretch(1, 1)
+        layout.setStretch(2, 0)
 
-        self.setCentralWidget(central)
+        return panel
+
+    def _build_keys_panel(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+
+        button_bar = QHBoxLayout()
+        button_bar.setContentsMargins(0, 0, 0, 0)
+        button_bar.setSpacing(6)
+        button_bar.addWidget(self._make_tool_button("New Key", QStyle.StandardPixmap.SP_FileIcon, self._add_key))
+        button_bar.addWidget(self._make_tool_button("Delete Key", QStyle.StandardPixmap.SP_TrashIcon, self._delete_key))
+        button_bar.addStretch()
+        layout.addLayout(button_bar)
+
+        splitter = QSplitter()
+        splitter.setChildrenCollapsible(False)
+        splitter.addWidget(self._build_keys_list_panel())
+        splitter.addWidget(self._build_key_details_panel())
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        layout.addWidget(splitter)
+
+        return panel
+
+    def _build_keys_list_panel(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self._keys_list = QListWidget()
+        self._keys_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._keys_list.currentRowChanged.connect(self._show_key_details)
+        layout.addWidget(self._keys_list)
+
+        return panel
+
+    def _build_key_details_panel(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self._key_details_table = QTableWidget()
+        self._key_details_table.setColumnCount(2)
+        self._key_details_table.setHorizontalHeaderLabels(["Property", "Value"])
+        self._key_details_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._key_details_table.verticalHeader().setVisible(False)
+        self._key_details_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._key_details_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._key_details_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        layout.addWidget(self._key_details_table)
+
+        return panel
+
+    def _add_key(self) -> None:
+        dialog = KeyDialog(self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        try:
+            keys_module.generate_key_pair(**dialog.key_options)
+        except Exception as exc:
+            QMessageBox.critical(self, "Error", f"Failed to generate key pair:\n{exc}")
+            return
+
+        self.load_keys()
+
+    def _delete_key(self) -> None:
+        index = self._keys_list.currentRow()
+        if index < 0 or index >= len(self._key_pairs):
+            QMessageBox.warning(self, "No Key Selected", "Select a key to delete.")
+            return
+
+        key_pair = self._key_pairs[index]
+
+        response = QMessageBox.question(
+            self,
+            "Delete Key",
+            f"Are you sure you want to delete key pair '{key_pair.base_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if response != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            if key_pair.private_info and key_pair.private_info.exists:
+                key_pair.private_info.path.unlink()
+            if key_pair.public_info and key_pair.public_info.exists:
+                key_pair.public_info.path.unlink()
+        except Exception as exc:
+            QMessageBox.critical(self, "Error", f"Failed to delete key pair:\n{exc}")
+            return
+
+        self.load_keys()
+
+    def load_keys(self) -> None:
+        """Fetch key pairs from the shared config logic and display them."""
+        try:
+            # Assuming default ssh path, can be changed later
+            self._key_pairs = keys_module.list_key_pairs("~/.ssh/keys")
+        except Exception as exc:  # pragma: no cover - UI feedback
+            QMessageBox.critical(self, "Error", f"Failed to load keys:\n{exc}")
+            return
+
+        self._keys_list.clear()
+        for key_pair in self._key_pairs:
+            self._keys_list.addItem(key_pair.base_name)
+
+    def _show_key_details(self, index: int) -> None:
+        if index < 0 or index >= len(self._key_pairs):
+            self._key_details_table.setRowCount(0)
+            return
+
+        key_pair = self._key_pairs[index]
+        self._key_details_table.setRowCount(0)
+
+        self._add_key_info("Private Key", key_pair.private_info)
+        self._add_key_info("Public Key", key_pair.public_info)
+
+    def _add_key_info(self, title: str, key_info: Optional[keys_module.KeyFileInfo]):
+        row = self._key_details_table.rowCount()
+        self._key_details_table.insertRow(row)
+        title_item = QTableWidgetItem(title)
+        title_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        self._key_details_table.setItem(row, 0, title_item)
+        self._key_details_table.setSpan(row, 0, 1, 2)
+
+        if key_info is None:
+            row = self._key_details_table.rowCount()
+            self._key_details_table.insertRow(row)
+            self._key_details_table.setItem(row, 0, QTableWidgetItem("Info"))
+            self._key_details_table.setItem(row, 1, QTableWidgetItem("Not found"))
+            return
+
+        def add_row(prop, value):
+            row = self._key_details_table.rowCount()
+            self._key_details_table.insertRow(row)
+            self._key_details_table.setItem(row, 0, QTableWidgetItem(prop))
+            self._key_details_table.setItem(row, 1, QTableWidgetItem(value))
+
+        add_row("Path", str(key_info.path))
+        add_row("Exists", str(key_info.exists))
+        if key_info.exists:
+            add_row("Size", str(key_info.size))
+            add_row("Mode", oct(key_info.mode))
+            add_row("Modified At", str(key_info.modified_at))
+            add_row("Description", key_info.description)
+        if key_info.error:
+            add_row("Error", key_info.error)
 
     def _build_button_panel(self) -> QWidget:
         container = QWidget()
@@ -95,13 +259,11 @@ class MainWindow(QMainWindow):
     def _build_splitter(self) -> QSplitter:
         splitter = QSplitter()
         splitter.setChildrenCollapsible(False)
-        splitter.addWidget(self._build_host_panel())
+        splitter.addWidget(self._build_host_list_panel())
         splitter.addWidget(self._build_options_panel())
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         return splitter
-
-
 
     def _build_details_panel(self) -> QWidget:
         container = QWidget()
@@ -149,7 +311,6 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             app.quit()
-
 
     def _update_details_label(self, block: Optional[HostBlock]) -> None:
         if block is None:
@@ -215,7 +376,7 @@ class MainWindow(QMainWindow):
         QApplication.instance().clipboard().setText(text)
 
 
-    def _build_host_panel(self) -> QWidget:
+    def _build_host_list_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -516,7 +677,7 @@ class MainWindow(QMainWindow):
         self._tag_filter.blockSignals(False)
 
     def _get_selected_tag(self) -> Optional[str]:
-        """Get the currently selected tag from the tag filter dropdown.
+        """Get the currently selected tag from the tag filter dropdown. 
         
         Returns:
             The tag name if a specific tag is selected, or None if "All" is selected.

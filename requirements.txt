@@ -1,2 +1,3 @@
 ixlab-sshcore>=1.0.0
 PyQt6>=6.5
+termqt>=1.1

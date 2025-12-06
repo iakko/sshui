@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
+    QSpacerItem,
 )
 
 from sshcore import config as config_module, settings as settings_module, keys as keys_module
@@ -42,6 +43,7 @@ from .text_prompt_dialog import TextPromptDialog
 from .tag_dialog import TagDialog
 from .key_dialog import KeyDialog
 from .about_dialog import AboutDialog
+from .terminal_window import TerminalWindow
 
 
 class MainWindow(QMainWindow):
@@ -57,6 +59,7 @@ class MainWindow(QMainWindow):
         self._blocks: List[HostBlock] = []
         self._visible_blocks: List[HostBlock] = []
         self._viewer_windows: List[QDialog] = []
+        self._terminal_windows: List[TerminalWindow] = []
         self._tag_color_cache: dict[str, QColor] = {}
         self._current_list_item_index: int = -1
         self._current_tree_item: QTreeWidgetItem | None = None
@@ -249,9 +252,12 @@ class MainWindow(QMainWindow):
         button_bar.setContentsMargins(0, 0, 0, 0)
         button_bar.setSpacing(6)
 
+        button_bar.addWidget(self._make_tool_button("Connect", QStyle.StandardPixmap.SP_MediaPlay, self._connect_to_host))
+        button_bar.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         button_bar.addWidget(self._make_tool_button("Refresh", QStyle.StandardPixmap.SP_BrowserReload, self.load_hosts))
         button_bar.addWidget(self._make_tool_button("Add", QStyle.StandardPixmap.SP_FileDialogNewFolder, self._add_host))
         button_bar.addWidget(self._make_tool_button("Duplicate", QStyle.StandardPixmap.SP_FileDialogStart, self._duplicate_host))
+        button_bar.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         button_bar.addWidget(self._make_tool_button("Delete", QStyle.StandardPixmap.SP_TrashIcon, self._delete_host))
         button_bar.addStretch()
         return container
@@ -999,6 +1005,63 @@ class MainWindow(QMainWindow):
             return
 
         self.load_hosts()
+
+    def _get_ssh_command_tokens(self, block: HostBlock) -> List[str]:
+        options = block.options
+        target_host = options.get("HostName") or (block.names_for_listing[0] if block.names_for_listing else block.patterns[0])
+        user = options.get("User", "")
+        tokens: List[str] = ["ssh"]
+
+        identity = options.get("IdentityFile")
+        if identity:
+            tokens.extend(["-i", identity])
+
+        port = options.get("Port")
+        if port:
+            tokens.extend(["-p", port])
+
+        proxy_jump = options.get("ProxyJump")
+        if proxy_jump:
+            tokens.extend(["-J", proxy_jump])
+
+        special_keys = {"HostName", "User", "Port", "IdentityFile", "ProxyJump"}
+        for key, value in options.items():
+            if key in special_keys or not value:
+                continue
+            tokens.extend(["-o", f"{key}={value}"])
+
+        target = target_host or block.patterns[0]
+        if user:
+            target = f"{user}@{target}"
+        tokens.append(target)
+        return tokens
+
+    def _connect_to_host(self) -> None:
+        block = self._current_block()
+        if block is None:
+            QMessageBox.warning(self, "No Host Selected", "Select a host to connect.")
+            return
+
+        command_tokens = self._get_ssh_command_tokens(block)
+        target_host = command_tokens[-1]
+        
+        terminal_window = TerminalWindow(command=command_tokens, title=f"SSH to {target_host}", parent=self)
+        
+        # Center the terminal window on the same screen as the main window
+        main_window_screen = self.screen()
+        if main_window_screen:
+            screen_geometry = main_window_screen.geometry()
+            terminal_window.move(screen_geometry.center() - terminal_window.rect().center())
+
+        self._terminal_windows.append(terminal_window)
+        terminal_window.show()
+
+        def _cleanup(*_args) -> None:
+            if terminal_window in self._terminal_windows:
+                self._terminal_windows.remove(terminal_window)
+
+        terminal_window.destroyed.connect(_cleanup)
+
 
     def _add_option(self) -> None:
         block = self._current_block()

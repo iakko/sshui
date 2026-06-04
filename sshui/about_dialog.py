@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 
+from .constants import APP_NAME
+
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -21,14 +23,16 @@ class AboutDialog(QDialog):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(14)
 
-        app_name = QLabel("SSH-UI")
+        app_name = QLabel(APP_NAME)
         app_name.setFont(QFont("Arial", 20, QFont.Weight.Black))
         app_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        app_name.setStyleSheet("color: #2c3e50; letter-spacing: 1px;")
+        # NOTE: hardcoded colors make the UI unreadable on dark themes
+        app_name.setStyleSheet("letter-spacing: 1px;")
 
         tagline = QLabel("Graphical companion for SSH power users")
         tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tagline.setStyleSheet("color: #7f8c8d; font-style: italic;")
+        # NOTE: hardcoded colors make the UI unreadable on dark themes
+        tagline.setStyleSheet("font-style: italic;")
 
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
@@ -43,22 +47,25 @@ class AboutDialog(QDialog):
 
         description.setWordWrap(True)
         description.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        description.setStyleSheet("color: #34495e; padding: 2px")
+        # NOTE: hardcoded colors make the UI unreadable on dark themes
+        description.setStyleSheet("padding: 2px")
 
         versions_lines = [
             f"<b>SSH-UI:</b> {sshui_version}",
             f"<b>SSH-CLI:</b> {'not installed' if not sshcli_version else sshcli_version}",
             f"<b>SSH-CORE:</b> {sshcore_version}",
         ]
+        # NOTE: hardcoded colors make the UI unreadable on dark themes
         versions_info = QLabel(
-            "<span style='color:#2c3e50; padding: 2px'>Versions</span><br>" + "<br>".join(versions_lines)
+            "<b>Versions</b><br>" + "<br>".join(versions_lines)
         )
         versions_info.setAlignment(Qt.AlignmentFlag.AlignLeft)
         versions_info.setTextFormat(Qt.TextFormat.RichText)
 
         info_card = QFrame()
+        # NOTE: hardcoded colors make the UI unreadable on dark themes
         info_card.setStyleSheet(
-            "QFrame {background-color: #f6f8fa; border: 1px solid #dce0e6; border-radius: 10px;}"
+            "QFrame {border: 1px solid #dce0e6; border-radius: 10px;}"
         )
         card_layout = QVBoxLayout(info_card)
         card_layout.setContentsMargins(14, 12, 14, 12)

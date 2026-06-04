@@ -6,7 +6,9 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QLabel,
     QListWidget,
+    QPushButton,
     QSplitter,
     QTableWidget,
     QMessageBox,
@@ -17,7 +19,10 @@ from PyQt6.QtWidgets import (
     QStyle,
 )
 
+from pathlib import Path
+
 from sshcore import keys as keys_module
+from .key_content_dialog import KeyContentDialog
 from .key_dialog import KeyDialog
 
 class KeyPanel(QWidget):
@@ -168,7 +173,12 @@ class KeyPanel(QWidget):
             self._key_details_table.setItem(row, 0, QTableWidgetItem(prop))
             self._key_details_table.setItem(row, 1, QTableWidgetItem(value))
 
-        add_row("Path", str(key_info.path))
+        # Path row: plain item on col-0, custom widget with View button on col-1
+        path_row = self._key_details_table.rowCount()
+        self._key_details_table.insertRow(path_row)
+        self._key_details_table.setItem(path_row, 0, QTableWidgetItem("Path"))
+        self._key_details_table.setCellWidget(path_row, 1, self._make_path_cell(key_info.path))
+
         add_row("Exists", str(key_info.exists))
         if key_info.exists:
             add_row("Size", str(key_info.size))
@@ -177,6 +187,31 @@ class KeyPanel(QWidget):
             add_row("Description", key_info.description)
         if key_info.error:
             add_row("Error", key_info.error)
+
+    def _make_path_cell(self, path: Path) -> QWidget:
+        """Return a widget with the path label and a View button for a path row."""
+        cell = QWidget()
+        layout = QHBoxLayout(cell)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(6)
+
+        label = QLabel(str(path))
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(label, 1)
+
+        btn = QPushButton("View")
+        btn.setFixedWidth(48)
+        btn.setEnabled(path.exists())
+        btn.clicked.connect(lambda: self._open_key_content(path))
+        layout.addWidget(btn)
+
+        return cell
+
+    def _open_key_content(self, path: Path) -> None:
+        if not path.exists():
+            QMessageBox.warning(self, "File Not Found", f"Key file does not exist:\n{path}")
+            return
+        KeyContentDialog(self, path=path).exec()
 
     def _make_tool_button(self, text: str, icon: QStyle.StandardPixmap, slot: Callable[[], None]) -> QToolButton:
         button = QToolButton()

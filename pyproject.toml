@@ -1,6 +1,6 @@
 [project]
 name = "ixlab-sshui"
-version = "1.1.1"
+version = "1.2.0"
 description = "PyQt6 UI for browsing and tagging SSH configs via sshcore."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,7 @@ dependencies = [
   "ixlab-sshcore>=1.0.0",
   "PyQt6>=6.5",
   "termqt>=1.1",
+  "pyobjc-framework-Cocoa>=9.0; sys_platform == 'darwin'",
 ]
 
 [project.urls]
@@ -27,3 +28,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["sshui*"]
+
+[tool.setuptools.package-data]
+sshui = ["*.svg"]

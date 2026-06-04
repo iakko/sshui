@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from sshcore.models import HostBlock
+from .constants import APP_TITLE
 from .about_dialog import AboutDialog
 from .terminal_window import TerminalWindow
 from .host_panel import HostPanel
@@ -25,7 +26,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("SSH-UI: The sshcli frontend!")
+        self.setWindowTitle(APP_TITLE)
         self.resize(900, 520)
         self._terminal_windows: List[TerminalWindow] = []
 

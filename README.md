@@ -2,6 +2,13 @@
 
 `sshui` is a PyQt6-based graphical frontend for the `sshcore` engine. It gives you a fast, tag-aware explorer for SSH configuration files, complete with host grouping, editing dialogs, and quick copy of SSH commands—without touching the command line.
 
+## What's New in 1.2.0
+
+- **Key content viewer** — select a key in the Keys tab and click the **View** button on a Path row to open a read-only window with the file content and a one-click Copy to Clipboard action.
+- **Redesigned app icon** — new 32×32 icon with transparent padding, rounded corners, and the `>SSH` logotype in pixel font.
+- Fixed `TypeError: 'type' object is not iterable` on startup with newer `cryptography` releases.
+- Fixed `XPM pixels missing on image line 15` warning logged on every launch.
+
 ## What's New in 1.1.0
 
 - **Key Management**: A dedicated panel for viewing, adding, and deleting SSH keys.

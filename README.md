@@ -2,6 +2,10 @@
 
 `sshui` is a PyQt6-based graphical frontend for the `sshcore` engine. It gives you a fast, tag-aware explorer for SSH configuration files, complete with host grouping, editing dialogs, and quick copy of SSH commands—without touching the command line.
 
+## What's New in 1.2.2
+
+- **macOS Dock icon** — the app icon now also shows in the macOS Dock (set via AppKit at startup), not just the menu-bar tray.
+
 ## What's New in 1.2.1
 
 - **Application icon** — the app now ships and displays its own icon (window, dock/taskbar, and system tray).

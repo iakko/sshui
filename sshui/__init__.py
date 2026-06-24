@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QBuffer, QByteArray
 from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 
@@ -34,6 +34,35 @@ def _patch_macos_app_menu(name: str) -> None:
         print(f"[sshui] could not patch macOS app menu: {exc}", file=sys.stderr)
 
 
+def _set_macos_dock_icon(icon: QIcon) -> None:
+    """Set the macOS Dock icon.
+
+    ``QApplication.setWindowIcon`` does not affect the Dock for a console-script
+    app, so we hand the icon to AppKit explicitly. The SVG is rendered through
+    Qt to PNG bytes because ``NSImage`` does not read SVG reliably.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        from AppKit import NSApplication, NSImage
+
+        pixmap = icon.pixmap(512, 512)
+        if pixmap.isNull():
+            return
+        data = QByteArray()
+        buffer = QBuffer(data)
+        buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+        pixmap.save(buffer, "PNG")
+        buffer.close()
+
+        ns_image = NSImage.alloc().initWithData_(bytes(data))
+        if ns_image is None:
+            return
+        NSApplication.sharedApplication().setApplicationIconImage_(ns_image)
+    except Exception as exc:  # pragma: no cover - platform/runtime guard
+        print(f"[sshui] could not set macOS dock icon: {exc}", file=sys.stderr)
+
+
 def main() -> int:
     """Entry point used by the `sshui` console script."""
     app = QApplication(sys.argv)
@@ -43,6 +72,7 @@ def main() -> int:
     icon_path = Path(__file__).parent / "sshui.svg"
     icon = QIcon(str(icon_path))
     app.setWindowIcon(icon)
+    _set_macos_dock_icon(icon)
 
     window = MainWindow()
     window.setWindowIcon(icon)

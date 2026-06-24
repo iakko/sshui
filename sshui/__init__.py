@@ -15,6 +15,28 @@ from .main_window import MainWindow
 __all__ = ["MainWindow", "main"]
 
 
+def _set_macos_app_name(name: str) -> None:
+    """Set the macOS menu-bar application name (the bold first menu item).
+
+    That name comes from the process ``CFBundleName``; for a console-script app
+    it defaults to the interpreter (e.g. ``python3.14``). Patching the bundle's
+    info dictionary must happen *before* ``QApplication`` builds the menu.
+    """
+    if sys.platform != "darwin":
+        return
+    try:
+        from Foundation import NSBundle
+
+        bundle = NSBundle.mainBundle()
+        if bundle is None:
+            return
+        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = name
+    except Exception as exc:  # pragma: no cover - platform/runtime guard
+        print(f"[sshui] could not set macOS app name: {exc}", file=sys.stderr)
+
+
 def _patch_macos_app_menu(name: str) -> None:
     """Rename the macOS application menu (the 'Python' entry in the menu bar)."""
     try:
@@ -65,6 +87,8 @@ def _set_macos_dock_icon(icon: QIcon) -> None:
 
 def main() -> int:
     """Entry point used by the `sshui` console script."""
+    _set_macos_app_name(APP_NAME)
+
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)

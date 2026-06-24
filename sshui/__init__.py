@@ -16,23 +16,26 @@ __all__ = ["MainWindow", "main"]
 
 
 def _set_macos_app_name(name: str) -> None:
-    """Set the macOS menu-bar application name (the bold first menu item).
+    """Set the macOS application name for an unbundled console-script app.
 
-    That name comes from the process ``CFBundleName``; for a console-script app
-    it defaults to the interpreter (e.g. ``python3.14``). Patching the bundle's
-    info dictionary must happen *before* ``QApplication`` builds the menu.
+    Two distinct identities default to the interpreter name (e.g. ``python3.14``)
+    and must be set separately, *before* ``QApplication`` initializes:
+
+    * ``CFBundleName`` drives the bold menu-bar entry.
+    * ``NSProcessInfo.processName`` drives the Dock tooltip.
     """
     if sys.platform != "darwin":
         return
     try:
-        from Foundation import NSBundle
+        from Foundation import NSBundle, NSProcessInfo
 
         bundle = NSBundle.mainBundle()
-        if bundle is None:
-            return
-        info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
-        if info is not None:
-            info["CFBundleName"] = name
+        if bundle is not None:
+            info = bundle.localizedInfoDictionary() or bundle.infoDictionary()
+            if info is not None:
+                info["CFBundleName"] = name
+
+        NSProcessInfo.processInfo().setProcessName_(name)
     except Exception as exc:  # pragma: no cover - platform/runtime guard
         print(f"[sshui] could not set macOS app name: {exc}", file=sys.stderr)
 
